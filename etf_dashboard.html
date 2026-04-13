@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETF題材儀表板 v10</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', 'PingFang TC', sans-serif; padding: 28px 32px; background: #eef2f7; color: #222; font-size: 17px; }
+  h1 { color: #00b885; margin-bottom: 4px; font-size: 1.8rem; letter-spacing: -0.3px; }
+  .subtitle { color: #888; font-size: 1.05rem; margin-bottom: 28px; }
+  .card { background: #fff; border-radius: 14px; padding: 22px 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); border: 1px solid #e2e8ef; }
+  .card h2 { font-size: 1.15rem; color: #333; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .grid-change { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .tag { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 700; }
+  .t81 { background: #e0ecfb; color: #2a6db5; }
+  .t91 { background: #faf0dc; color: #a07020; }
+  .t92 { background: #f0e8fa; color: #7a2aa5; }
+  .legend { display: flex; gap: 16px; margin-bottom: 16px; font-size: 1rem; }
+  .legend span { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  canvas { max-height: 320px; }
+  .card table { width: 100%; border-collapse: collapse; font-size: 1rem; }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  th { text-align: left; padding: 9px 10px; border-bottom: 2px solid #d0d7e0; color: #666; font-size: 1rem; font-weight: 600; }
+  td { padding: 9px 10px; border-bottom: 1px solid #f0f2f5; }
+  tr:last-child td { border-bottom: none; }
+  .w-cell { display: flex; align-items: center; gap: 8px; }
+  .w-bar { height: 7px; background: #e8ecf0; border-radius: 3px; flex: 1; max-width: 80px; }
+  .w-fill { height: 7px; border-radius: 3px; }
+  .pct { font-size: 1rem; color: #888; min-width: 42px; text-align: right; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 5px; font-size: 0.78rem; font-weight: 700; }
+  .b-green { background: #d4edda; color: #155724; }
+  .b-yellow { background: #fff3cd; color: #856404; }
+  .b-red { background: #f8d7da; color: #721c24; }
+  .diff { font-weight: 700; }
+  .insight { background: #f8fbff; border: 1px solid #d0e4ff; border-radius: 10px; padding: 16px 20px; line-height: 1.8; font-size: 1rem; color: #333; }
+  .panel { display: none; padding: 4px 0 14px; }
+  .panel.open { display: block; }
+  .change-up { color: #e84040; font-weight: 700; }
+  .change-down { color: #666; font-weight: 700; }
+  .change-new { color: #1a8a3a; font-weight: 700; }
+  .change-rm { color: #cc3333; font-weight: 700; }
+  .no-data { color: #999; font-size: 1rem; padding: 20px 0; text-align: center; }
+  .snapshot-note { background: #f0f7ff; border: 1px solid #c0d8f0; border-radius: 8px; padding: 10px 16px; font-size: 1rem; color: #555; margin-bottom: 16px; }
+  .stock-chip { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; margin: 1px; }
+  .chip-theme { background: #e8f5ee; color: #1e6e3a; border: 1px solid #c3e5d0; }
+  .stock-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 2px; border-bottom: 1px solid #f0f2f5; font-size: 1rem; }
+  .stock-n { color: #222; white-space: nowrap; }
+  .stock-w { color: #00b885; font-weight: 700; font-size: 1rem; white-space: nowrap; padding-left: 10px; }
+  .stock-ticker { color: #999; font-size: 0.78rem; margin-left: 4px; }
+  .change-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #f0f2f5; font-size: 1rem; }
+  .change-item:last-child { border-bottom: none; }
+  .change-label { display: flex; align-items: center; gap: 6px; }
+  .change-sym { font-size: 1rem; }
+  .change-name { color: #222; }
+  .change-val { font-weight: 700; text-align: right; }
+  .trend-wrap { display: none; }
+  .trend-wrap.has-data { display: block; }
+  .no-trend { color: #999; font-size: 1rem; padding: 20px; text-align: center; display: block; }
+  .no-trend.hidden { display: none; }
+  @media (max-width: 750px) { .grid, .grid-3, .grid-change { grid-template-columns: 1fr; } body { padding: 16px; } }
+</style>
+</head>
+<body>
+
+<h1>🦞 主動型 ETF 題材儀表板</h1>
+<p class="subtitle">2026/04/10｜00981A × 00991A × 00992A</p>
+
+<!-- 小俠觀點 -->
+<div class="card" style="background: linear-gradient(135deg, #1a3a5c 0%, #0f2233 100%); border:none;">
+  <h2 style="color:#8ec8f8; border-bottom:1px solid rgba(255,255,255,0.1); font-size:1.05rem;">💡 小俠觀點：三大 ETF 經理人配置解讀</h2>
+  <div class="insight" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#e8eef5; font-size:1rem; line-height:1.9;">
+    <p><strong style="color:#8ec8f8;">📌 共識區（經理人普遍重倉）</strong><br>
+    PCB/CCL 三檔皆逾 15%，台光電、金像電、景碩為核心共識股。<br>
+    CoWoS/先進封裝 除 00992A 略低外，00981A（20%）與 00991A（24.2%）皆為首選。</p>
+    <p style="margin-top:10px;"><strong style="color:#8ec8f8;">⚡ 分歧區（經理人各走各路）</strong><br>
+    <span class="tag t81">00981A</span> 傾斜散熱/水冷（12%）→ 奇鋐、健策、高力<br>
+    <span class="tag t91">00991A</span> 傾斜記憶體（13.6%）→ 群聯、南亞科<br>
+    <span class="tag t92">00992A</span> 傾斜 AI 網通/光通訊（17.2%）→ 智邦、波若威、穩懋</p>
+    <p style="margin-top:10px;"><strong style="color:#8ec8f8;">🔍 特殊亮點</strong><br>
+    00991A 的 <strong style="color:#f7c948;">鴻勁（功率電感）</strong> 權重達 4.51%，明顯高於另外兩檔，是其獨特取捨。<br>
+    00992A 覆蓋光通訊（穩懋、聯亞、昇達科），為三檔中唯一配置此題材者。</p>
+  </div>
+</div>
+
+<!-- 揭露日快照說明 -->
+<div class="snapshot-note">
+  📅 揭露日快照：已記錄 <strong id="snapCount">1</strong> 筆（近 90 天滾動）。歷史趨勢圖需至少 2 筆揭露日才能呈現。
+</div>
+
+<!-- 雷達圖 + 主題權重趨勢 -->
+<div class="grid">
+  <div class="card">
+    <h2>📡 主題配置雷達圖</h2>
+    <div class="legend">
+      <span><div class="dot" style="background:#2a6db5"></div><span class="tag t81">00981A</span></span>
+      <span><div class="dot" style="background:#a07020"></div><span class="tag t91">00991A</span></span>
+      <span><div class="dot" style="background:#7a2aa5"></div><span class="tag t92">00992A</span></span>
+    </div>
+    <canvas id="radar"></canvas>
+  </div>
+  <div class="card">
+    <h2>📈 主題權重趨勢（近揭露日）</h2>
+    <div id="trendPlaceholder" class="no-trend">累積 2 筆揭露日後自動呈現</div>
+    <canvas id="trendChart" class="trend-wrap"></canvas>
+  </div>
+</div>
+
+<!-- 長條圖 -->
+<div class="grid-3">
+  <div class="card">
+    <h2><span class="tag t81">00981A</span></h2>
+    <canvas id="bar81A"></canvas>
+    <div id="detail81A" class="panel"></div>
+  </div>
+  <div class="card">
+    <h2><span class="tag t91">00991A</span></h2>
+    <canvas id="bar91A"></canvas>
+    <div id="detail91A" class="panel"></div>
+  </div>
+  <div class="card">
+    <h2><span class="tag t92">00992A</span></h2>
+    <canvas id="bar92A"></canvas>
+    <div id="detail92A" class="panel"></div>
+  </div>
+</div>
+
+<!-- 持股變化（與上次揭露日比較） -->
+<div class="card">
+  <h2>🔄 與上次揭露日比較（Top 5）</h2>
+  <div class="grid-change">
+    <div id="change81A" class="change-col"></div>
+    <div id="change91A" class="change-col"></div>
+    <div id="change92A" class="change-col"></div>
+  </div>
+</div>
+
+<!-- 主題比較表 -->
+<div class="card">
+  <h2>📊 主題權重比較表</h2>
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>題材</th>
+        <th><span class="tag t81" style="font-size:0.75rem">00981A</span></th>
+        <th><span class="tag t91" style="font-size:0.75rem">00991A</span></th>
+        <th><span class="tag t92" style="font-size:0.75rem">00992A</span></th>
+        <th>最大差距</th>
+        <th>信號</th>
+      </tr>
+    </thead>
+    <tbody id="cmpTbody"></tbody>
+  </table>
+  </div>
+</div>
+
+<!-- 個股明細 Top20 -->
+<div class="card">
+  <h2>📋 個股明細 Top 20</h2>
+  <div class="grid-change">
+    <div>
+      <h3 style="font-size:1rem;color:#2a6db5;margin-bottom:6px;"><span class="tag t81">00981A</span></h3>
+      <div id="stockList81A" style="font-size:1rem;"></div>
+    </div>
+    <div>
+      <h3 style="font-size:1rem;color:#a07020;margin-bottom:6px;"><span class="tag t91">00991A</span></h3>
+      <div id="stockList91A" style="font-size:1rem;"></div>
+    </div>
+    <div>
+      <h3 style="font-size:1rem;color:#7a2aa5;margin-bottom:6px;"><span class="tag t92">00992A</span></h3>
+      <div id="stockList92A" style="font-size:1rem;"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  "use strict";
+
+  var THEME_INFO = {
+    "PCB/CCL":     { zh:"PCB/CCL",          color:"#4a9eff" },
+    "CoWoS":       { zh:"CoWoS/先進封裝",    color:"#00c896" },
+    "Heatsink":    { zh:"散熱/水冷",          color:"#ff9f43" },
+    "AI_Net":      { zh:"AI網通/交換器",      color:"#ee5a5a" },
+    "ASIC":        { zh:"ASIC/IC設計",        color:"#9b59b6" },
+    "Connector":  { zh:"連接器/線材",        color:"#1abc9c" },
+    "Memory":      { zh:"記憶體/Storage",     color:"#f7c948" },
+    "Optic":       { zh:"光通訊/微波射頻",    color:"#3498db" },
+    "Power":       { zh:"功率元件/AI電源",    color:"#e67e22" },
+    "AI_Server":   { zh:"AI伺服器/ODM",      color:"#2ecc71" },
+    "Equipment":   { zh:"半導體設備/無塵室",  color:"#e74c3c" },
+    "Passive":     { zh:"被動元件",           color:"#f39c12" },
+    "Material":    { zh:"基本材料",           color:"#95a5a6" }
+  };
+
+  var THEMES = ["PCB/CCL","CoWoS","Heatsink","AI_Net","ASIC","Connector",
+                "Memory","Optic","Power","AI_Server","Equipment","Passive","Material"];
+
+  var W81 = {
+    "PCB/CCL":26.59,"CoWoS":19.97,"Heatsink":12.00,"AI_Net":5.90,
+    "ASIC":5.75,"Connector":1.80,"Memory":0,"Optic":0,"Power":6.27,
+    "AI_Server":0.25,"Equipment":2.00,"Passive":2.61,"Material":2.29
+  };
+  var W91 = {
+    "PCB/CCL":25.57,"CoWoS":24.20,"Heatsink":6.70,"AI_Net":7.16,
+    "ASIC":6.46,"Connector":0.01,"Memory":13.59,"Optic":0,"Power":11.09,
+    "AI_Server":0.02,"Equipment":0,"Passive":0.01,"Material":0
+  };
+  var W92 = {
+    "PCB/CCL":15.42,"CoWoS":13.98,"Heatsink":8.59,"AI_Net":10.48,
+    "ASIC":7.69,"Connector":7.52,"Memory":7.33,"Optic":6.73,"Power":3.68,
+    "AI_Server":3.64,"Equipment":3.47,"Passive":0,"Material":0
+  };
+  var WEIGHTS = {"00981A":W81,"00991A":W91,"00992A":W92};
+  var TICKERS = ["00981A","00991A","00992A"];
+  var TC = ["#4a9eff","#00c896","#ff9f43","#ee5a5a","#9b59b6","#1abc9c",
+            "#f7c948","#3498db","#e67e22","#2ecc71","#e74c3c","#f39c12","#95a5a6"];
+
+  // ─── Stocks DB ─────────────────────────────────────────────────────────────
+  var STOCKS = {
+    "00981A":[
+      {n:"台積電",c:"2330",t:"CoWoS",w:9.11},{n:"台光電",c:"2383",t:"PCB/CCL",w:8.08},
+      {n:"台達電",c:"2308",t:"Power",w:6.27},{n:"金像電",c:"2368",t:"PCB/CCL",w:5.94},
+      {n:"健策",c:"3653",t:"Heatsink",w:5.77},{n:"奇鋐",c:"3017",t:"Heatsink",w:5.66},
+      {n:"贸聯-KY",c:"3665",t:"Connector",w:5.54},{n:"智邦",c:"2345",t:"AI_Net",w:5.52},
+      {n:"旺矽",c:"6223",t:"CoWoS",w:5.39},{n:"欣興",c:"3037",t:"CoWoS",w:4.82},
+      {n:"南電",c:"8046",t:"CoWoS",w:4.51},{n:"信驊",c:"5274",t:"ASIC",w:3.30},
+      {n:"國巨",c:"2327",t:"Passive",w:2.61},{n:"日月光投控",c:"3711",t:"CoWoS",w:2.00},
+      {n:"台燿",c:"6274",t:"PCB/CCL",w:1.78},{n:"穎崴",c:"6515",t:"CoWoS",w:1.75},
+      {n:"富世達",c:"6805",t:"Connector",w:1.74},{n:"精測",c:"6510",t:"ASIC",w:1.74},
+      {n:"京元電子",c:"2449",t:"CoWoS",w:1.72},{n:"南亞",c:"1303",t:"Material",w:1.33}
+    ],
+    "00991A":[
+      {n:"台積電",c:"2330",t:"CoWoS",w:19.80},{n:"台光電",c:"2383",t:"PCB/CCL",w:9.03},
+      {n:"群聯",c:"8299",t:"Memory",w:7.56},{n:"欣興",c:"3037",t:"CoWoS",w:6.74},
+      {n:"台達電",c:"2308",t:"Power",w:6.58},{n:"南亞科",c:"2408",t:"Memory",w:6.03},
+      {n:"鴻勁",c:"7769",t:"Power",w:4.51},{n:"旺矽",c:"6223",t:"CoWoS",w:4.35},
+      {n:"智邦",c:"2345",t:"AI_Net",w:4.24},{n:"奇鋐",c:"3017",t:"Heatsink",w:4.11},
+      {n:"信驊",c:"5274",t:"ASIC",w:3.74},{n:"金像電",c:"2368",t:"PCB/CCL",w:3.60},
+      {n:"南電",c:"8046",t:"CoWoS",w:3.30},{n:"光聖",c:"6442",t:"AI_Net",w:2.92},
+      {n:"景碩",c:"3189",t:"PCB/CCL",w:2.89},{n:"致茂",c:"2360",t:"ASIC",w:2.71},
+      {n:"贸聯-KY",c:"3665",t:"Connector",w:2.69},{n:"健策",c:"3653",t:"Heatsink",w:2.59},
+      {n:"文曄",c:"3036",t:"ASIC",w:1.49},{n:"廣達",c:"2382",t:"AI_Server",w:0.01}
+    ],
+    "00992A":[
+      {n:"台積電",c:"2330",t:"CoWoS",w:6.63},{n:"台光電",c:"2383",t:"PCB/CCL",w:4.54},
+      {n:"智邦",c:"2345",t:"AI_Net",w:4.01},{n:"旺矽",c:"6223",t:"CoWoS",w:3.73},
+      {n:"穎崴",c:"6515",t:"CoWoS",w:3.62},{n:"波若威",c:"3163",t:"AI_Net",w:3.50},
+      {n:"奇鋐",c:"3017",t:"Heatsink",w:3.45},{n:"欣興",c:"3037",t:"CoWoS",w:3.35},
+      {n:"穩懋",c:"3105",t:"Optic",w:3.28},{n:"嘉澤",c:"3533",t:"Connector",w:3.20},
+      {n:"高力",c:"8996",t:"Heatsink",w:3.06},{n:"光聖",c:"6442",t:"AI_Net",w:2.97},
+      {n:"群聯",c:"8299",t:"Memory",w:2.96},{n:"致茂",c:"2360",t:"ASIC",w:2.72},
+      {n:"川湖",c:"2059",t:"Connector",w:2.64},{n:"鴻勁",c:"7769",t:"Power",w:2.45},
+      {n:"南電",c:"8046",t:"CoWoS",w:2.35},{n:"竑騰",c:"4533",t:"Equipment",w:2.34},
+      {n:"緯穎",c:"6669",t:"AI_Server",w:2.18},{n:"南亞科",c:"2408",t:"Memory",w:2.15}
+    ]
+  };
+
+  Chart.defaults.font.size = 12;
+  Chart.defaults.font.family = "'Segoe UI', 'PingFang TC', sans-serif";
+
+  // ─── Radar ──────────────────────────────────────────────────────────────────
+  var radarDatasets = [
+    {label:"00981A",data:[],bg:"rgba(42,109,181,0.15)",border:"#2a6db5"},
+    {label:"00991A",data:[],bg:"rgba(160,112,32,0.15)",border:"#a07020"},
+    {label:"00992A",data:[],bg:"rgba(122,42,165,0.15)",border:"#7a2aa5"}
+  ];
+  radarDatasets[0].data = THEMES.map(function(t){ return W81[t]; });
+  radarDatasets[1].data = THEMES.map(function(t){ return W91[t]; });
+  radarDatasets[2].data = THEMES.map(function(t){ return W92[t]; });
+
+  new Chart(document.getElementById("radar"),{
+    type:"radar",
+    data:{labels:THEMES.map(function(t){ return THEME_INFO[t].zh; }),datasets:radarDatasets.map(function(d){
+      return {label:d.label,data:d.data,backgroundColor:d.bg,borderColor:d.border,borderWidth:2,pointRadius:3};
+    })},
+    options:{
+      responsive:true,plugins:{legend:{display:false}},
+      scales:{r:{
+        angleLines:{color:"rgba(0,0,0,0.07)"},grid:{color:"rgba(0,0,0,0.07)"},
+        pointLabels:{color:"#444",font:{size:12}},ticks:{display:false},suggestedMin:0,suggestedMax:28
+      }}
+    }
+  });
+
+  // ─── Bar Chart Factory ────────────────────────────────────────────────────
+  function makeBar(canvasId, ticker, panelId) {
+    var weights = WEIGHTS[ticker];
+    var items = [];
+    for (var i = 0; i < THEMES.length; i++) {
+      var t = THEMES[i];
+      items.push({t:t, w:weights[t]});
+    }
+    items.sort(function(a,b){ return b.w - a.w; });
+
+    var labels = items.map(function(x){ return THEME_INFO[x.t].zh; });
+    var data = items.map(function(x){ return x.w; });
+    var bg = items.map(function(x,i){ return TC[i % TC.length] + "99"; });
+    var border = items.map(function(x,i){ return TC[i % TC.length]; });
+
+    new Chart(document.getElementById(canvasId),{
+      type:"bar",
+      data:{labels:labels,datasets:[{data:data,backgroundColor:bg,borderColor:border,borderWidth:1.5,borderRadius:4}]},
+      options:{
+        indexAxis:"y",
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        onClick:function(evt, active) {
+          if (!active.length) return;
+          var themeKey = items[active[0].index].t;
+          renderDetail(panelId, ticker, themeKey);
+        },
+        scales:{
+          x:{ticks:{color:"#555",font:{size:11},callback:function(v){return v+"%";}},grid:{color:"rgba(0,0,0,0.06)"},suggestedMax:30},
+          y:{ticks:{color:"#555",font:{size:11}},grid:{display:false}}
+        }
+      }
+    });
+  }
+
+  function renderDetail(panelId, ticker, themeKey) {
+    var panel = document.getElementById(panelId);
+    var isOpen = panel.classList.contains("open") && panel.dataset.open === themeKey;
+    if (isOpen) { panel.classList.remove("open"); return; }
+    panel.classList.add("open");
+    panel.dataset.open = themeKey;
+
+    var stocks = STOCKS[ticker] || [];
+    var filtered = [];
+    for (var i = 0; i < stocks.length; i++) {
+      if (stocks[i].t === themeKey) filtered.push(stocks[i]);
+    }
+    filtered.sort(function(a,b){ return b.w - a.w; });
+
+    if (!filtered.length) {
+      panel.innerHTML = '<div style="color:#999;font-size:1rem;padding:6px 0;">此主題無持股明細</div>';
+      return;
+    }
+    var html = '';
+    for (var j = 0; j < filtered.length; j++) {
+      var s = filtered[j];
+      html += '<div class="stock-detail-row">' +
+        '<span class="stock-n">' + s.n + '<span class="stock-ticker">(' + s.c + ')</span></span>' +
+        '<span class="stock-w">' + s.w.toFixed(2) + '%</span></div>';
+    }
+    panel.innerHTML = html;
+  }
+
+  makeBar("bar81A","00981A","detail81A");
+  makeBar("bar91A","00991A","detail91A");
+  makeBar("bar92A","00992A","detail92A");
+
+  // ─── Comparison Table ────────────────────────────────────────────────────────
+  var T88 = {"00981A":"#2a6db5","00991A":"#a07020","00992A":"#7a2aa5"};
+  var tbody = document.getElementById("cmpTbody");
+  var v81,v91,v92,maxV,minV,diff,badgeHtml,diffColor;
+
+  for (var j = 0; j < THEMES.length; j++) {
+    var t = THEMES[j];
+    v81 = W81[t]; v91 = W91[t]; v92 = W92[t];
+    maxV = Math.max(v81,v91,v92); minV = Math.min(v81,v91,v92); diff = maxV - minV;
+
+    if (diff < 3) { badgeHtml = '<span class="badge b-green">共識</span>'; diffColor = "#155724"; }
+    else if (diff < 8) { badgeHtml = '<span class="badge b-yellow">分歧</span>'; diffColor = "#856404"; }
+    else { badgeHtml = '<span class="badge b-red">高度分歧</span>'; diffColor = "#721c24"; }
+
+    function wc(val, color) {
+      var pct = val.toFixed(1);
+      return '<div class="w-cell">' +
+        '<div class="w-bar"><div class="w-fill" style="width:' + Math.min(100,val*4) + '%;background:' + color + '"></div></div>' +
+        '<span class="pct">' + pct + '%</span></div>';
+    }
+
+    var row = tbody.insertRow(j);
+    row.insertCell(0).textContent = THEME_INFO[t].zh;
+    row.insertCell(1).innerHTML = wc(v81, T88["00981A"]);
+    row.insertCell(2).innerHTML = wc(v91, T88["00991A"]);
+    row.insertCell(3).innerHTML = wc(v92, T88["00992A"]);
+    var dc = row.insertCell(4);
+    dc.className = "diff";
+    dc.style.color = diffColor;
+    dc.textContent = diff.toFixed(1) + "%";
+    row.insertCell(5).innerHTML = badgeHtml;
+  }
+
+  // ─── Stock Lists ────────────────────────────────────────────────────────────
+  function renderStockList(divId, ticker) {
+    var stocks = STOCKS[ticker] || [];
+    var div = document.getElementById(divId);
+    var html = '';
+    for (var i = 0; i < Math.min(stocks.length, 20); i++) {
+      var s = stocks[i];
+      var zh = THEME_INFO[s.t] ? THEME_INFO[s.t].zh : s.t;
+      html += '<div class="stock-detail-row">' +
+        '<span><span class="stock-chip chip-theme">' + zh + '</span> ' +
+        '<span class="stock-n">' + s.n + '</span>' +
+        '<span class="stock-ticker">(' + s.c + ')</span></span>' +
+        '<span class="stock-w">' + s.w.toFixed(2) + '%</span></div>';
+    }
+    div.innerHTML = html;
+  }
+
+  renderStockList("stockList81A","00981A");
+  renderStockList("stockList91A","00991A");
+  renderStockList("stockList92A","00992A");
+
+  // ─── Trend Chart (placeholder – activates when 2+ snapshots exist) ─────────
+  // Currently hidden; the trend chart requires 2+ data points from snapshot data.
+  // When the Dashboard is regenerated with snapshot data embedded, set window.ETF_SNAPSHOTS
+  // and call drawTrendChart().
+
+  // ─── Change Cards (placeholder – shows "only 1 snapshot" message) ───────────
+  var snapCount = 1;
+  document.getElementById("snapCount").textContent = snapCount;
+  var changeEmpty = '<div class="no-data">僅 1 筆揭露日，尚無與上次的比較資料<br><span style="font-size:1rem;color:#999">等下次揭露日更新後自動呈現</span></div>';
+  document.getElementById("change81A").innerHTML = changeEmpty;
+  document.getElementById("change91A").innerHTML = changeEmpty;
+  document.getElementById("change92A").innerHTML = changeEmpty;
+
+})();
+</script>
+
+<script>
+window.__ETF_DATA__ = {
+  latest: {"00981A": {"date": "2026/04/10", "holdings": {") 持有股數 台積電(2330.TW)": {"lots": 5518, "weight": 9.11}, "台光電(2383.TW)": {"lots": 2861, "weight": 8.08}, "台達電(2308.TW)": {"lots": 4379, "weight": 6.27}, "金像電(2368.TW)": {"lots": 6607, "weight": 5.94}, "健策(3653.TW)": {"lots": 1694, "weight": 5.77}, "奇鋐(3017.TW)": {"lots": 3026, "weight": 5.66}, "貿聯-KY(3665.TW)": {"lots": 3053, "weight": 5.54}, "智邦(2345.TW)": {"lots": 3646, "weight": 5.52}, "旺矽(6223.TW)": {"lots": 1414, "weight": 5.39}, "欣興(3037.TW)": {"lots": 9147, "weight": 4.82}, "南電(8046.TW)": {"lots": 8189, "weight": 4.51}, "信驊(5274.TW)": {"lots": 318, "weight": 3.3}, "國巨*(2327.TW)": {"lots": 11083, "weight": 2.61}, "日月光投控(3711.TW)": {"lots": 6159, "weight": 2.0}, "台燿(6274.TW)": {"lots": 2670, "weight": 1.78}, "穎崴(6515.TW)": {"lots": 268, "weight": 1.75}, "富世達(6805.TW)": {"lots": 1130, "weight": 1.74}, "精測(6510.TW)": {"lots": 604, "weight": 1.74}, "京元電子(2449.TW)": {"lots": 7512, "weight": 1.72}, "南亞(1303.TW)": {"lots": 19743, "weight": 1.33}, "順達(3211.TW)": {"lots": 4086, "weight": 1.26}, "景碩(3189.TW)": {"lots": 2657, "weight": 0.84}, "亞翔(6139.TW)": {"lots": 1559, "weight": 0.82}, "頎邦(6147.TW)": {"lots": 7692, "weight": 0.67}, "聯發科(2454.TW)": {"lots": 508, "weight": 0.66}, "世界(5347.TW)": {"lots": 5845, "weight": 0.62}, "金居(8358.TW)": {"lots": 2750, "weight": 0.62}, "創意(3443.TW)": {"lots": 267, "weight": 0.59}, "世芯-KY(3661.TW)": {"lots": 233, "weight": 0.58}, "漢唐(2404.TW)": {"lots": 764, "weight": 0.58}, "環球晶(6488.TW)": {"lots": 1330, "weight": 0.54}, "欣銓(3264.TW)": {"lots": 2870, "weight": 0.45}, "高力(8996.TW)": {"lots": 515, "weight": 0.44}, "華星光(4979.TW)": {"lots": 1037, "weight": 0.38}, "台化(1326.TW)": {"lots": 9001, "weight": 0.34}, "萬潤(6187.TW)": {"lots": 388, "weight": 0.31}, "辛耘(3583.TW)": {"lots": 526, "weight": 0.29}, "精成科(6191.TW)": {"lots": 3402, "weight": 0.28}, "新日興(3376.TW)": {"lots": 1428, "weight": 0.24}, "緯穎(6669.TW)": {"lots": 76, "weight": 0.23}, "強茂(2481.TW)": {"lots": 1636, "weight": 0.14}, "雙鴻(3324.TW)": {"lots": 160, "weight": 0.13}, "中鋼(2002.TW)": {"lots": 4929, "weight": 0.08}, "東陽(1319.TW)": {"lots": 982, "weight": 0.07}, "優群(3217.TW)": {"lots": 477, "weight": 0.06}, "大立光(3008.TW)": {"lots": 10, "weight": 0.02}, "勤誠(8210.TW)": {"lots": 34, "weight": 0.02}, "美律(2439.TW)": {"lots": 8, "weight": 0.0}, "華碩(2357.TW)": {"lots": 8, "weight": 0.0}, "富喬(1815.TW)": {"lots": 5, "weight": 0.0}, "華通(2313.TW)": {"lots": 7, "weight": 0.0}, "台灣大(3045.TW)": {"lots": 8, "weight": 0.0}}}, "00991A": {"date": "2026/04/10", "holdings": {") 持有股數 台積電(2330.TW)": {"lots": 3000, "weight": 19.8}, "台光電(2383.TW)": {"lots": 800, "weight": 9.03}, "群聯(8299.TW)": {"lots": 1380, "weight": 7.56}, "欣興(3037.TW)": {"lots": 3200, "weight": 6.74}, "台達電(2308.TW)": {"lots": 1150, "weight": 6.58}, "南亞科(2408.TW)": {"lots": 8500, "weight": 6.03}, "鴻勁(7769.TW)": {"lots": 325, "weight": 4.51}, "旺矽(6223.TW)": {"lots": 285, "weight": 4.35}, "智邦(2345.TW)": {"lots": 700, "weight": 4.24}, "奇鋐(3017.TW)": {"lots": 550, "weight": 4.11}, "信驊(5274.TW)": {"lots": 90, "weight": 3.74}, "金像電(2368.TW)": {"lots": 1000, "weight": 3.6}, "南電(8046.TW)": {"lots": 1500, "weight": 3.3}, "光聖(6442.TW)": {"lots": 380, "weight": 2.92}, "景碩(3189.TW)": {"lots": 2300, "weight": 2.89}, "致茂(2360.TW)": {"lots": 460, "weight": 2.71}, "貿聯-KY(3665.TW)": {"lots": 370, "weight": 2.69}, "健策(3653.TW)": {"lots": 190, "weight": 2.59}, "文曄(3036.TW)": {"lots": 2000, "weight": 1.49}, "穎崴(6515.TW)": {"lots": 1, "weight": 0.03}, "精測(6510.TW)": {"lots": 1, "weight": 0.01}, "日月光投控(3711.TW)": {"lots": 9, "weight": 0.01}, "川湖(2059.TW)": {"lots": 1, "weight": 0.01}, "廣達(2382.TW)": {"lots": 9, "weight": 0.01}, "華通(2313.TW)": {"lots": 9, "weight": 0.01}, "國巨*(2327.TW)": {"lots": 9, "weight": 0.01}, "京元電子(2449.TW)": {"lots": 9, "weight": 0.01}, "長榮(2603.TW)": {"lots": 9, "weight": 0.01}, "鴻海(2317.TW)": {"lots": 9, "weight": 0.01}, "聯發科(2454.TW)": {"lots": 1, "weight": 0.01}, "緯創(3231.TW)": {"lots": 9, "weight": 0.0}, "旺宏(2337.TW)": {"lots": 9, "weight": 0.0}, "亞德客-KY(1590.TW)": {"lots": 1, "weight": 0.0}, "世界(5347.TW)": {"lots": 9, "weight": 0.0}, "台燿(6274.TW)": {"lots": 1, "weight": 0.0}, "勤誠(8210.TW)": {"lots": 1, "weight": 0.0}, "華城(1519.TW)": {"lots": 1, "weight": 0.0}, "華邦電(2344.TW)": {"lots": 9, "weight": 0.0}, "漢唐(2404.TW)": {"lots": 1, "weight": 0.0}, "富邦金(2881.TW)": {"lots": 9, "weight": 0.0}, "國泰金(2882.TW)": {"lots": 9, "weight": 0.0}, "中信金(2891.TW)": {"lots": 9, "weight": 0.0}, "健鼎(3044.TW)": {"lots": 1, "weight": 0.0}, "元大金(2885.TW)": {"lots": 9, "weight": 0.0}, "永豐金(2890.TW)": {"lots": 9, "weight": 0.0}, "長榮航太(2645.TW)": {"lots": 1, "weight": 0.0}, "台灣大(3045.TW)": {"lots": 1, "weight": 0.0}, "中華電(2412.TW)": {"lots": 1, "weight": 0.0}, "南亞(1303.TW)": {"lots": 1, "weight": 0.0}, "台塑化(6505.TW)": {"lots": 1, "weight": 0.0}}}, "00992A": {"date": "2026/04/10", "holdings": {") 持有股數 台積電(2330.TW)": {"lots": 806, "weight": 6.63}, "台光電(2383.TW)": {"lots": 323, "weight": 4.54}, "智邦(2345.TW)": {"lots": 531, "weight": 4.01}, "旺矽(6223.TW)": {"lots": 196, "weight": 3.73}, "穎崴(6515.TW)": {"lots": 111, "weight": 3.62}, "波若威(3163.TW)": {"lots": 676, "weight": 3.5}, "奇鋐(3017.TW)": {"lots": 370, "weight": 3.45}, "欣興(3037.TW)": {"lots": 1277, "weight": 3.35}, "穩懋": {"lots": 1716, "weight": 3.28}, "嘉澤(3533.TW)": {"lots": 343, "weight": 3.2}, "高力(8996.TW)": {"lots": 715, "weight": 3.06}, "光聖(6442.TW)": {"lots": 310, "weight": 2.97}, "群聯(8299.TW)": {"lots": 434, "weight": 2.96}, "致茂(2360.TW)": {"lots": 370, "weight": 2.72}, "川湖(2059.TW)": {"lots": 191, "weight": 2.64}, "鴻勁(7769.TW)": {"lots": 142, "weight": 2.45}, "南電(8046.TW)": {"lots": 858, "weight": 2.35}, "竑騰": {"lots": 285, "weight": 2.34}, "緯穎(6669.TW)": {"lots": 146, "weight": 2.18}, "南亞科(2408.TW)": {"lots": 2432, "weight": 2.15}, "精測": {"lots": 142, "weight": 2.04}, "金居(8358.TW)": {"lots": 1728, "weight": 1.94}, "新應材(4749.TW)": {"lots": 526, "weight": 1.93}, "聯亞": {"lots": 185, "weight": 1.76}, "健策(3653.TW)": {"lots": 100, "weight": 1.7}, "富世達(6805.TW)": {"lots": 219, "weight": 1.68}, "信驊(5274.TW)": {"lots": 29, "weight": 1.5}, "南俊國際(6584.TW)": {"lots": 566, "weight": 1.46}, "世界(5347.TW)": {"lots": 2277, "weight": 1.21}, "環宇-KY": {"lots": 511, "weight": 1.16}, "弘塑(3131.TW)": {"lots": 87, "weight": 1.13}, "金像電(2368.TW)": {"lots": 227, "weight": 1.02}, "台達電(2308.TW)": {"lots": 135, "weight": 0.96}, "一詮(2486.TW)": {"lots": 1230, "weight": 0.94}, "貿聯-KY(3665.TW)": {"lots": 100, "weight": 0.91}, "文曄": {"lots": 947, "weight": 0.88}, "力旺(3529.TW)": {"lots": 67, "weight": 0.81}, "愛普*(6531.TW)": {"lots": 367, "weight": 0.78}, "台燿(6274.TW)": {"lots": 230, "weight": 0.76}, "尖點(8021.TW)": {"lots": 570, "weight": 0.74}, "世芯-KY(3661.TW)": {"lots": 59, "weight": 0.73}, "創意(3443.TW)": {"lots": 66, "weight": 0.72}, "景碩(3189.TW)": {"lots": 457, "weight": 0.72}, "昇達科": {"lots": 71, "weight": 0.53}, "宜鼎(5289.TW)": {"lots": 90, "weight": 0.43}, "旺宏": {"lots": 671, "weight": 0.4}, "雙鴻(3324.TW)": {"lots": 93, "weight": 0.38}, "日月光投控": {"lots": 236, "weight": 0.38}, "威剛(3260.TW)": {"lots": 231, "weight": 0.35}, "AES-KY(6781.TW)": {"lots": 67, "weight": 0.27}, "華邦電(2344.TW)": {"lots": 663, "weight": 0.26}}}},
+  snapshots: [{"date": "2026/04/10", "etf": "00981A", "theme_weights": {"PCB/CCL": 26.590000000000003, "CoWoS": 0.0, "Heatsink": 0.0, "AI_Net": 0.0, "ASIC": 0.0, "Connector": 0.0, "Memory": 0.0, "Optic": 0.0, "Power": 0.0, "AI_Server": 0.0, "Equipment": 0.0, "Passive": 0.0, "Material": 0.0, "Other": 69.24999999999999}, "top_stocks": {"PCB/CCL": {"name": "台光電(2383.TW)", "w": 8.08}, "CoWoS": {}, "Heatsink": {}, "AI_Net": {}, "ASIC": {}, "Connector": {}, "Memory": {}, "Optic": {}, "Power": {}, "AI_Server": {}, "Equipment": {}, "Passive": {}, "Material": {}}, "delta": {"added": [], "removed": [], "increased": [], "decreased": []}}, {"date": "2026/04/10", "etf": "00991A", "theme_weights": {"PCB/CCL": 25.570000000000004, "CoWoS": 0.0, "Heatsink": 0.0, "AI_Net": 0.0, "ASIC": 0.0, "Connector": 0.0, "Memory": 0.0, "Optic": 0.0, "Power": 0.0, "AI_Server": 0.0, "Equipment": 0.0, "Passive": 0.0, "Material": 0.0, "Other": 73.44000000000004}, "top_stocks": {"PCB/CCL": {"name": "台光電(2383.TW)", "w": 9.03}, "CoWoS": {}, "Heatsink": {}, "AI_Net": {}, "ASIC": {}, "Connector": {}, "Memory": {}, "Optic": {}, "Power": {}, "AI_Server": {}, "Equipment": {}, "Passive": {}, "Material": {}}, "delta": {"added": [], "removed": [], "increased": [], "decreased": []}}, {"date": "2026/04/10", "etf": "00992A", "theme_weights": {"PCB/CCL": 15.42, "CoWoS": 0.0, "Heatsink": 0.0, "AI_Net": 0.0, "ASIC": 0.0, "Connector": 0.0, "Memory": 0.0, "Optic": 0.0, "Power": 0.0, "AI_Server": 0.0, "Equipment": 0.0, "Passive": 0.0, "Material": 0.0, "Other": 80.18999999999997}, "top_stocks": {"PCB/CCL": {"name": "台光電(2383.TW)", "w": 4.54}, "CoWoS": {}, "Heatsink": {}, "AI_Net": {}, "ASIC": {}, "Connector": {}, "Memory": {}, "Optic": {}, "Power": {}, "AI_Server": {}, "Equipment": {}, "Passive": {}, "Material": {}}, "delta": {"added": [], "removed": [], "increased": [], "decreased": []}}],
+  generated: "2026/04/13 16:41"
+};
+</script>
+</body>
+</html>
