@@ -272,7 +272,10 @@
   TICKERS.forEach(function(tkr) {
     var snap = (window.ETF_SNAPSHOTS||[]).filter(function(s){return s.etf===tkr;})[0];
     WEIGHTS[tkr] = snap ? snap.theme_weights : {};
-    var holdings = ((window.ETF_LATEST||{})[tkr]||{}).holdings || {};
+    
+    // ✅ 正解：改從最新的快照(snap) 中讀取 holdings
+    var holdings = snap ? snap.holdings : {}; 
+    
     var list = [];
     Object.keys(holdings).forEach(function(hname) {
       var w = parseFloat(holdings[hname].weight)||0;
