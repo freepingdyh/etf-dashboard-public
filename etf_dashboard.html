@@ -440,12 +440,18 @@ window.ETF_GENERATED = "2026/05/06 14:52";
     var list = [];
     Object.keys(holdings).forEach(function(hname) {
       var w = parseFloat(holdings[hname].weight)||0;
-      if (w<=0) return;
+      if (w <= 0) return;
       var m = hname.match(/\(([0-9A-Za-z]+)\.TW\)/);
       var code = m ? m[1] : "";
       var cleanName = hname.split('(')[0].replace(/^[):：\s]*(持有股[数數])?\s*/, "").trim();
-      var theme = (code && window.CODE_TO_THEME[code]) || window.CODE_TO_THEME[cleanName] || "Other";
-      list.push({n:hname, w:w, t:theme});
+      
+      // 🛡️ 關鍵防彈邏輯：確保 window.CODE_TO_THEME 存在才讀取，否則預設為 "Other"
+      var theme = "Other";
+      if (typeof window.CODE_TO_THEME !== "undefined" && window.CODE_TO_THEME) {
+          theme = (code && window.CODE_TO_THEME[code]) || window.CODE_TO_THEME[cleanName] || "Other";
+      }
+      
+      list.push({n:hname, w:w, t:theme, c:code}); // 順便把代碼 c 補進去，防止其他地方用到
     });
     list.sort(function(a,b){return b.w-a.w;});
     STOCKS[tkr] = list;
