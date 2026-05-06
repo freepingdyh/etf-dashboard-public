@@ -395,7 +395,10 @@ window.ETF_GENERATED = "2026/05/06 11:57";
       var m = hname.match(/\(([0-9A-Za-z]+)\.TW\)/);
       var code = m ? m[1] : "";
       var cleanName = hname.split('(')[0].replace(/^[):：\s]*(持有股[数數])?\s*/, "").trim();
-      var theme = (code && window.CODE_TO_THEME[code]) || window.CODE_TO_THEME[cleanName] || "Other";
+      var theme = "Other";
+      if (typeof window.CODE_TO_THEME !== "undefined") {
+          theme = (code && window.CODE_TO_THEME[code]) || window.CODE_TO_THEME[cleanName] || "Other";
+      }
       list.push({n:hname, w:w, t:theme});
     });
     list.sort(function(a,b){return b.w-a.w;});
