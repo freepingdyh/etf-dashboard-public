@@ -438,7 +438,9 @@ window.ETF_GENERATED = "2026/05/06 14:10";
       var m = hname.match(/\(([0-9A-Za-z]+)\.TW\)/);
       var code = m ? m[1] : "";
       var cleanName = hname.split('(')[0].replace(/^[):：\s]*(持有股[数數])?\s*/, "").trim();
-      var theme = (code && window.CODE_TO_THEME[code]) || window.CODE_TO_THEME[cleanName] || "Other";
+      // ✅ 改成這樣 (使用 Optional Chaining ?. 與 Nullish Coalescing ??)
+      var themeMap = window.CODE_TO_THEME || {};
+      var theme = (code && themeMap[code]) || themeMap[cleanName] || "Other";
       list.push({n:hname, w:w, t:theme});
     });
     list.sort(function(a,b){return b.w-a.w;});
