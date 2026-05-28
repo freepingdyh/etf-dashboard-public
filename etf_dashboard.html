@@ -140,8 +140,8 @@ window.ETF_DATA_STATUS={"latest_dates": {"00981A": "2026/05/27", "00991A": "2026
 </div>
 </div>
 <div class="card">
-<h2>📈 主題權重趨勢（近揭露日）</h2>
-<div style="font-size:0.85rem;color:#888;margin-bottom:12px;">緞帶由下而上依配比由大到小排列</div>
+<h2>📈 主題權重趨勢（最近 30 個完整揭露日）</h2>
+<div style="font-size:0.85rem;color:#888;margin-bottom:12px;">緞帶由下而上依配比由大到小排列；三檔未同時揭露或資料異常的日期自動排除</div>
 <div class="no-trend" id="trendPlaceholder">累積 2 筆揭露日後自動呈現</div>
 <div class="trend-wrap" id="trendContainer">
 <div style="margin-bottom: 24px;">
@@ -264,7 +264,9 @@ window.ETF_DATA_STATUS={"latest_dates": {"00981A": "2026/05/27", "00991A": "2026
   }
 
   TICKERS.forEach(function(tkr) {
-    var snap = (window.ETF_SNAPSHOTS||[]).filter(function(s){return s.etf===tkr;})[0];
+    // 雷達圖/比較表必須使用最新快照，不可誤用歷史陣列第一筆。
+    var snap = (window.ETF_LATEST||{})[tkr] ||
+      (window.ETF_SNAPSHOTS||[]).filter(function(s){return s.etf===tkr;}).slice(-1)[0];
     WEIGHTS[tkr] = snap ? snap.theme_weights : {};
     var holdings = ((window.ETF_LATEST||{})[tkr]||{}).holdings || {};
     var list = [];
@@ -360,35 +362,53 @@ window.ETF_DATA_STATUS={"latest_dates": {"00981A": "2026/05/27", "00991A": "2026
     });
   })();
 
+  function isValidTrendSnapshot(snap) {
+    if (!snap || !snap.theme_weights) return false;
+    var total = THEMES.reduce(function(sum, theme) {
+      return sum + (parseFloat(snap.theme_weights[theme]) || 0);
+    }, 0);
+    // 正常已揭露快照合計應接近 100%；此門檻用來排除空資料/解析失敗。
+    return total >= 50;
+  }
+
   function drawTrendChart() {
     var snaps = window.ETF_SNAPSHOTS || [];
-    var dates = [...new Set(snaps.map(function(s){return s.date;}))].sort();
+    var maxTrendPoints = 30;
+
+    // 以三檔皆存在且有效的共同揭露日作圖，避免缺資料被誤畫為 0%。
+    var dates = [...new Set(snaps.map(function(s){ return s.date; }))].sort().filter(function(date) {
+      return TICKERS.every(function(tkr) {
+        var snap = snaps.find(function(s){ return s.etf === tkr && s.date === date; });
+        return isValidTrendSnapshot(snap);
+      });
+    });
+
     if (dates.length < 2) return;
-    if (dates.length > 20) { dates = dates.slice(-20); }
-    
+    if (dates.length > maxTrendPoints) dates = dates.slice(-maxTrendPoints);
+
     var tc = ["#4a9eff","#1abc9c","#f7c948","#3498db","#9b59b6","#e67e22","#2ecc71","#e74c3c","#f39c12","#95a5a6","#00c896","#ee5a5a","#ff9f43"];
-    
-    TICKERS.forEach(function(tkr, tki) {
+
+    TICKERS.forEach(function(tkr) {
       var datasets = [];
-      var validThemes = THEMES.filter(function(t){return t!=="Other";});
-      
+      var validThemes = THEMES.filter(function(theme){ return theme !== "Other"; });
+
       var themeSums = {};
       validThemes.forEach(function(theme) {
-        themeSums[theme] = dates.reduce(function(sum, d) {
-          var s = snaps.find(function(x){return x.etf===tkr && x.date===d;});
-          return sum + (s ? (s.theme_weights[theme]||0) : 0);
+        themeSums[theme] = dates.reduce(function(sum, date) {
+          var snap = snaps.find(function(s){ return s.etf === tkr && s.date === date; });
+          return sum + (parseFloat(snap.theme_weights[theme]) || 0);
         }, 0);
       });
-      
+
       validThemes.sort(function(a, b) {
         return themeSums[b] - themeSums[a];
       });
 
       validThemes.forEach(function(theme) {
         var ti = THEMES.indexOf(theme);
-        var data = dates.map(function(d) {
-          var s = snaps.find(function(x){return x.etf===tkr && x.date===d;});
-          return s ? (s.theme_weights[theme]||0) : 0;
+        var data = dates.map(function(date) {
+          var snap = snaps.find(function(s){ return s.etf === tkr && s.date === date; });
+          return parseFloat(snap.theme_weights[theme]) || 0;
         });
         datasets.push({
           label: THEME_INFO[theme].zh,
@@ -402,15 +422,14 @@ window.ETF_DATA_STATUS={"latest_dates": {"00981A": "2026/05/27", "00991A": "2026
           pointHoverRadius: 4
         });
       });
-      
+
       var ctxId = "trend" + tkr.replace("009", "");
       var ctxEl = document.getElementById(ctxId);
-      if(!ctxEl) return;
-      var ctx = ctxEl.getContext("2d");
-      
-      new Chart(ctx, {
+      if (!ctxEl) return;
+
+      new Chart(ctxEl.getContext("2d"), {
         type: "line",
-        data: { labels: dates.map(function(d){return d.substring(5);}), datasets: datasets },
+        data: { labels: dates.map(function(date){ return date.substring(5); }), datasets: datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
@@ -429,9 +448,7 @@ window.ETF_DATA_STATUS={"latest_dates": {"00981A": "2026/05/27", "00991A": "2026
     var ph = document.getElementById("trendPlaceholder");
     if (ph) ph.classList.add("hidden");
     var trendEl = document.getElementById("trendContainer");
-    if (trendEl) {
-        trendEl.classList.add("has-data");
-    }
+    if (trendEl) trendEl.classList.add("has-data");
   }
   drawTrendChart();
 
